@@ -143,7 +143,7 @@ begin
   on conflict (show_id, seat_id) do nothing;
   return new;
 end;
-$$ language plpgsql;
+$$ language plpgsql security definer set search_path = public, pg_temp;
 
 drop trigger if exists trg_populate_show_seats on public.shows;
 create trigger trg_populate_show_seats
