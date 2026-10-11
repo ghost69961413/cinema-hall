@@ -461,8 +461,10 @@ create policy "Profiles can be updated by owner" on public.profiles for update u
 create policy "Movies are viewable by everyone" on public.movies for select to public using (true);
 drop policy if exists "Admins can insert movies" on public.movies;
 drop policy if exists "Admins can delete movies" on public.movies;
+drop policy if exists "Admins can update movies" on public.movies;
 create policy "Admins can insert movies" on public.movies for insert to authenticated with check (public.is_admin());
 create policy "Admins can delete movies" on public.movies for delete to authenticated using (public.is_admin());
+create policy "Admins can update movies" on public.movies for update to authenticated using (public.is_admin()) with check (public.is_admin());
 create policy "Screens are viewable by everyone" on public.screens for select to public using (true);
 create policy "Seats are viewable by everyone" on public.seats for select to public using (true);
 create policy "Shows are viewable by everyone" on public.shows for select to public using (true);
@@ -484,6 +486,7 @@ create policy "Admins can update shows" on public.shows for update to authentica
 grant usage on schema public to anon, authenticated;
 grant select on public.movies, public.screens, public.seats, public.shows, public.show_seats to anon, authenticated;
 grant insert on public.movies to authenticated;
+grant update on public.movies to authenticated;
 grant delete on public.movies to authenticated;
 grant select, update on public.profiles to authenticated;
 grant select on public.bookings, public.payments to authenticated;

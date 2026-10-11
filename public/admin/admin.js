@@ -2,7 +2,7 @@
   const client = window.APP_CONFIG.isConfigured() && window.supabase
     ? window.supabase.createClient(window.APP_CONFIG.SUPABASE_URL, window.APP_CONFIG.SUPABASE_ANON_KEY)
     : null;
-  const state = { screens: [], movies: [], selectedScreenId: null, shows: [], selectedShowId: null, data: null, editingScreenId: null, channel: null, refreshInterval: null, databaseUpdateHandler: null, countdown: null, dashboardRequestVersion: 0 };
+  const state = { screens: [], movies: [], selectedScreenId: null, shows: [], selectedShowId: null, data: null, editingScreenId: null, editingMovieId: null, channel: null, refreshInterval: null, databaseUpdateHandler: null, countdown: null, dashboardRequestVersion: 0 };
   const $ = id => document.getElementById(id);
 
   function escapeHtml(value) {
@@ -60,7 +60,7 @@
   async function loadMovies() {
     if (client) {
       const { data, error } = await client.from('movies')
-        .select('id,title,poster_url,language,duration_min,created_at')
+        .select('id,title,poster_url,language,duration_min,genre,rating,synopsis,created_at')
         .order('created_at', { ascending:false });
       if (error) { toast(error.message, 'error'); return; }
       state.movies = data || [];
@@ -88,10 +88,18 @@
           <div><div class="admin-movie-title">${escapeHtml(movie.title)}</div>
             <div class="admin-movie-detail">${escapeHtml(movie.language || 'Language not set')}${movie.duration_min ? ` · ${escapeHtml(movie.duration_min)} min` : ''}</div></div>
         </div>
+        <div class="admin-movie-actions">
+        <button type="button" class="admin-movie-edit" data-edit-movie="${escapeHtml(movie.id)}" aria-label="Edit ${escapeHtml(movie.title)}">
+          <i class="fa-solid fa-pen"></i><span>Edit</span>
+        </button>
         <button type="button" class="admin-movie-delete" data-delete-movie="${escapeHtml(movie.id)}" aria-label="Delete ${escapeHtml(movie.title)}">
           <i class="fa-solid fa-trash"></i><span>Delete</span>
         </button>
+        </div>
       </article>`).join('') || '<p class="cinema-item-detail">No movies in Currently Screening.</p>';
+    list.querySelectorAll('[data-edit-movie]').forEach(button => {
+      button.addEventListener('click', () => beginMovieEdit(button.dataset.editMovie));
+    });
     list.querySelectorAll('[data-delete-movie]').forEach(button => {
       button.addEventListener('click', () => deleteMovie(button.dataset.deleteMovie));
     });
@@ -494,23 +502,63 @@
     if (!movie.title || !movie.language || !Number.isInteger(movie.duration_min) || movie.duration_min < 1) {
       return toast('Enter a title, language, and valid duration.', 'error');
     }
+    const editingMovieId = state.editingMovieId;
     if (client) {
-      const { error } = await client.from('movies').insert(movie);
+      const result = editingMovieId
+        ? await client.from('movies').update(movie).eq('id', editingMovieId)
+        : await client.from('movies').insert(movie);
+      const { error } = result;
       if (error) return toast(error.message, 'error');
       await loadMovies();
     } else {
       const db = window.MockDbEngine;
       db.syncFromStorage();
-      db.movies.push({ id:`local-movie-${Date.now()}`, ...movie, created_at:new Date().toISOString() });
+      if (editingMovieId) {
+        const existing = db.movies.find(item => item.id === editingMovieId);
+        if (!existing) return toast('This movie is no longer available.', 'error');
+        Object.assign(existing, movie);
+      } else {
+        db.movies.push({ id:`local-movie-${Date.now()}`, ...movie, created_at:new Date().toISOString() });
+      }
       db.persist();
       await loadMovies();
     }
-    $('movie-form').reset();
-    $('movie-rating').value = 'UA';
+    resetMovieForm();
     renderMovieOptions();
     window.dispatchEvent(new CustomEvent('database-catalog-updated'));
-    toast('Movie added and published to the catalog', 'success');
+    toast(editingMovieId ? 'Movie details updated' : 'Movie added and published to the catalog', 'success');
   }
+
+  function beginMovieEdit(movieId) {
+    const movie = state.movies.find(item => item.id === movieId);
+    if (!movie) return;
+    state.editingMovieId = movie.id;
+    $('movie-title').value = movie.title || '';
+    $('movie-poster-url').value = movie.poster_url || '';
+    $('movie-language').value = movie.language || '';
+    $('movie-duration').value = movie.duration_min || '';
+    $('movie-genre').value = movie.genre || '';
+    $('movie-rating').value = movie.rating || 'UA';
+    $('movie-synopsis').value = movie.synopsis || '';
+    $('movie-form-title').textContent = 'Edit movie details';
+    $('movie-form-description').textContent = 'Update the title, poster, language, duration, genre, rating, or description.';
+    $('add-movie-button').textContent = 'Save changes';
+    $('movie-cancel-edit').hidden = false;
+    $('movie-title').focus();
+    $('movie-form').scrollIntoView({ behavior:'smooth', block:'center' });
+  }
+
+  function resetMovieForm() {
+    state.editingMovieId = null;
+    $('movie-form').reset();
+    $('movie-rating').value = 'UA';
+    $('movie-form-title').textContent = 'Add a movie to Currently Screening';
+    $('movie-form-description').textContent = 'Paste a poster image link. The movie will appear in Currently Screening for customers.';
+    $('add-movie-button').textContent = 'Add movie';
+    $('movie-cancel-edit').hidden = true;
+  }
+
+  function cancelMovieEdit() { resetMovieForm(); }
 
   async function deleteMovie(movieId) {
     const movie = state.movies.find(item => item.id === movieId);
@@ -571,6 +619,7 @@
   $('show-picker').addEventListener('change', event => selectShow(event.target.value));
   $('show-screen').addEventListener('change', event => selectScreen(event.target.value));
   $('movie-form').addEventListener('submit', addMovie);
+  $('movie-cancel-edit').addEventListener('click', cancelMovieEdit);
   $('booked-search').addEventListener('input', renderDashboard);
   $('cinema-form').addEventListener('submit', saveScreen);
   $('show-schedule-form').addEventListener('submit', saveShowSchedule);

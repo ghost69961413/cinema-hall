@@ -47,7 +47,7 @@
 
     <section class="admin-details">
       <form id="movie-form" class="movie-form panel-card">
-        <div class="show-schedule-heading"><h2>Add a movie to Currently Screening</h2><p>Paste a poster image link. The movie will appear in Currently Screening for customers.</p></div>
+        <div class="show-schedule-heading"><h2 id="movie-form-title">Add a movie to Currently Screening</h2><p id="movie-form-description">Paste a poster image link. The movie will appear in Currently Screening for customers.</p></div>
         <label>Movie title<input id="movie-title" class="form-input" type="text" required maxlength="160"></label>
         <label>Poster image link<input id="movie-poster-url" class="form-input" type="url" placeholder="https://example.com/poster.jpg" required></label>
         <label>Language<input id="movie-language" class="form-input" type="text" required maxlength="60"></label>
@@ -56,6 +56,7 @@
         <label>Rating<input id="movie-rating" class="form-input" type="text" maxlength="12" value="UA"></label>
         <label class="movie-synopsis-field">Description<textarea id="movie-synopsis" class="form-input" rows="2" maxlength="1000"></textarea></label>
         <button id="add-movie-button" class="btn btn-primary btn-sm" type="submit">Add movie</button>
+        <button id="movie-cancel-edit" class="btn btn-secondary btn-sm" type="button" hidden>Cancel edit</button>
       </form>
       <section class="admin-movies panel-card" aria-labelledby="admin-movies-title">
         <div class="show-schedule-heading"><h2 id="admin-movies-title">Currently Screening</h2><p>Manage movies shown in the customer movie list.</p></div>

@@ -91,6 +91,7 @@ drop policy if exists "Admins can view all payments" on public.payments;
 drop policy if exists "Admins can insert cinemas" on public.screens;
 drop policy if exists "Admins can insert movies" on public.movies;
 drop policy if exists "Admins can delete movies" on public.movies;
+drop policy if exists "Admins can update movies" on public.movies;
 drop policy if exists "Admins can update cinemas" on public.screens;
 drop policy if exists "Admins can delete cinemas" on public.screens;
 
@@ -100,6 +101,7 @@ create policy "Admins can view all show seats" on public.show_seats for select t
 create policy "Admins can view all payments" on public.payments for select to authenticated using (public.is_admin());
 create policy "Admins can insert movies" on public.movies for insert to authenticated with check (public.is_admin());
 create policy "Admins can delete movies" on public.movies for delete to authenticated using (public.is_admin());
+create policy "Admins can update movies" on public.movies for update to authenticated using (public.is_admin()) with check (public.is_admin());
 create policy "Admins can insert cinemas" on public.screens for insert to authenticated with check (public.is_admin());
 create policy "Admins can update cinemas" on public.screens for update to authenticated using (public.is_admin()) with check (public.is_admin());
 create policy "Admins can delete cinemas" on public.screens for delete to authenticated using (public.is_admin());
@@ -112,6 +114,7 @@ create policy "Admins can update shows" on public.shows for update to authentica
 
 grant usage on schema public to authenticated;
 grant insert on public.movies to authenticated;
+grant update on public.movies to authenticated;
 grant delete on public.movies to authenticated;
 grant insert, update, delete on public.screens to authenticated;
 grant insert, update on public.shows to authenticated;
