@@ -25,6 +25,15 @@
 .movie-form .movie-synopsis-field { grid-column:span 3; }
 .movie-form textarea { resize:vertical; }
 .movie-form .btn { justify-content:center; min-height:2.6rem; }
+.admin-movies { padding:1rem 1.2rem; background:rgba(19,22,34,.94); border:1px solid var(--border-subtle); border-radius:var(--radius-lg); }
+.admin-movie-list { display:grid; gap:.55rem; margin-top:.85rem; }
+.admin-movie-item { display:flex; align-items:center; justify-content:space-between; gap:.75rem; padding:.65rem; border:1px solid #2A2F45; background:#10131D; border-radius:10px; }
+.admin-movie-main { display:flex; align-items:center; gap:.7rem; min-width:0; }
+.admin-movie-poster { width:38px; height:54px; object-fit:cover; border-radius:5px; background:#202438; }
+.admin-movie-title { color:#F8FAFC; font-size:.8rem; font-weight:700; overflow-wrap:anywhere; }
+.admin-movie-detail { color:#94A3B8; font-size:.7rem; margin-top:.2rem; }
+.admin-movie-delete { display:inline-flex; align-items:center; gap:.35rem; padding:.4rem .55rem; border:1px solid #63343B; border-radius:7px; color:#FCA5A5; background:#29171B; font-size:.7rem; cursor:pointer; flex:none; }
+.admin-movie-delete:hover { color:#fff; background:#7F1D1D; }
 .admin-detail-header { padding:1rem 1.2rem; display:flex; align-items:center; justify-content:space-between; gap:1rem; }
 .show-schedule-form { margin-top:1rem; padding:1rem 1.2rem; display:grid; grid-template-columns:minmax(140px,1.15fr) minmax(150px,1.2fr) minmax(180px,1fr) minmax(130px,.7fr) auto; align-items:end; gap:.75rem; background:rgba(19,22,34,.94); border:1px solid var(--border-subtle); border-radius:var(--radius-lg); }
 .show-schedule-heading { grid-column:1 / -1; }

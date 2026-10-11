@@ -17,6 +17,7 @@ drop policy if exists "Profiles are viewable by owner" on public.profiles;
 drop policy if exists "Profiles can be updated by owner" on public.profiles;
 drop policy if exists "Movies are viewable by everyone" on public.movies;
 drop policy if exists "Admins can insert movies" on public.movies;
+drop policy if exists "Admins can delete movies" on public.movies;
 drop policy if exists "Screens are viewable by everyone" on public.screens;
 drop policy if exists "Seats are viewable by everyone" on public.seats;
 drop policy if exists "Shows are viewable by everyone" on public.shows;
@@ -54,6 +55,8 @@ create policy "Movies are viewable by everyone"
 
 create policy "Admins can insert movies" on public.movies
   for insert to authenticated with check (public.is_admin());
+create policy "Admins can delete movies" on public.movies
+  for delete to authenticated using (public.is_admin());
 
 create policy "Screens are viewable by everyone"
   on public.screens for select
@@ -111,6 +114,7 @@ create policy "Admins can delete cinemas" on public.screens
 grant usage on schema public to anon, authenticated;
 grant select on public.movies to anon, authenticated;
 grant insert on public.movies to authenticated;
+grant delete on public.movies to authenticated;
 grant select on public.screens to anon, authenticated;
 grant select on public.seats to anon, authenticated;
 grant select on public.shows to anon, authenticated;

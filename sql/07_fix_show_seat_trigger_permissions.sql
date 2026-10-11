@@ -17,3 +17,11 @@ end;
 $$;
 
 -- Existing trigger continues to call the replaced function.
+
+-- Admins may delete catalog movies. The schema cascades this deletion to
+-- their shows, show_seats, bookings, and payments.
+drop policy if exists "Admins can delete movies" on public.movies;
+create policy "Admins can delete movies"
+  on public.movies for delete to authenticated
+  using (public.is_admin());
+grant delete on public.movies to authenticated;

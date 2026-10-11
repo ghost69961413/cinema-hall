@@ -59,7 +59,7 @@
 
   async function loadMovies() {
     if (client) {
-      const { data, error } = await client.from('movies').select('id,title').order('title');
+      const { data, error } = await client.from('movies').select('id,title,poster_url,language,duration_min').order('title');
       if (error) { toast(error.message, 'error'); return; }
       state.movies = data || [];
     } else {
@@ -67,10 +67,30 @@
       state.movies = [...window.MockDbEngine.movies].sort((a, b) => a.title.localeCompare(b.title));
     }
     renderMovieOptions();
+    renderCurrentMovies();
   }
 
   function renderMovieOptions() {
     $('show-movie').innerHTML = state.movies.map(movie => `<option value="${escapeHtml(movie.id)}">${escapeHtml(movie.title)}</option>`).join('');
+  }
+
+  function renderCurrentMovies() {
+    const list = $('admin-movie-list');
+    if (!list) return;
+    list.innerHTML = state.movies.map(movie => `
+      <article class="admin-movie-item">
+        <div class="admin-movie-main">
+          ${movie.poster_url ? `<img class="admin-movie-poster" src="${escapeHtml(movie.poster_url)}" alt="" loading="lazy">` : '<span class="admin-movie-poster" aria-hidden="true"></span>'}
+          <div><div class="admin-movie-title">${escapeHtml(movie.title)}</div>
+            <div class="admin-movie-detail">${escapeHtml(movie.language || 'Language not set')}${movie.duration_min ? ` · ${escapeHtml(movie.duration_min)} min` : ''}</div></div>
+        </div>
+        <button type="button" class="admin-movie-delete" data-delete-movie="${escapeHtml(movie.id)}" aria-label="Delete ${escapeHtml(movie.title)}">
+          <i class="fa-solid fa-trash"></i><span>Delete</span>
+        </button>
+      </article>`).join('') || '<p class="cinema-item-detail">No movies in Currently Screening.</p>';
+    list.querySelectorAll('[data-delete-movie]').forEach(button => {
+      button.addEventListener('click', () => deleteMovie(button.dataset.deleteMovie));
+    });
   }
 
   async function loadScreens() {
@@ -486,6 +506,33 @@
     renderMovieOptions();
     window.dispatchEvent(new CustomEvent('database-catalog-updated'));
     toast('Movie added and published to the catalog', 'success');
+  }
+
+  async function deleteMovie(movieId) {
+    const movie = state.movies.find(item => item.id === movieId);
+    if (!movie) return;
+    const message = `Delete “${movie.title}”? This also deletes its show schedules, seat states, bookings, and payment records. This cannot be undone.`;
+    if (!window.confirm(message)) return;
+    if (client) {
+      const { error } = await client.from('movies').delete().eq('id', movieId);
+      if (error) return toast(error.message, 'error');
+    } else {
+      const db = window.MockDbEngine;
+      db.syncFromStorage();
+      const showIds = db.shows.filter(show => show.movie_id === movieId).map(show => show.id);
+      const bookingIds = db.bookings.filter(booking => showIds.includes(booking.show_id)).map(booking => booking.id);
+      db.movies = db.movies.filter(item => item.id !== movieId);
+      db.shows = db.shows.filter(show => show.movie_id !== movieId);
+      db.show_seats = db.show_seats.filter(seat => !showIds.includes(seat.show_id));
+      db.bookings = db.bookings.filter(booking => !bookingIds.includes(booking.id));
+      db.payments = db.payments.filter(payment => !bookingIds.includes(payment.booking_id));
+      db.persist();
+    }
+    if (state.shows.some(show => show.movie_id === movieId)) state.selectedShowId = null;
+    await loadMovies();
+    if (state.selectedScreenId) await selectScreen(state.selectedScreenId);
+    window.dispatchEvent(new CustomEvent('database-catalog-updated'));
+    toast('Movie deleted', 'success');
   }
   async function deleteScreen(screenId) {
     const screen = state.screens.find(item => item.id === screenId);
