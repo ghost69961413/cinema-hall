@@ -2,7 +2,7 @@
   const client = window.APP_CONFIG.isConfigured() && window.supabase
     ? window.supabase.createClient(window.APP_CONFIG.SUPABASE_URL, window.APP_CONFIG.SUPABASE_ANON_KEY)
     : null;
-  const state = { screens: [], movies: [], selectedScreenId: null, shows: [], selectedShowId: null, data: null, editingScreenId: null, channel: null, refreshInterval: null, databaseUpdateHandler: null, countdown: null };
+  const state = { screens: [], movies: [], selectedScreenId: null, shows: [], selectedShowId: null, data: null, editingScreenId: null, channel: null, refreshInterval: null, databaseUpdateHandler: null, countdown: null, dashboardRequestVersion: 0 };
   const $ = id => document.getElementById(id);
 
   function escapeHtml(value) {
@@ -127,7 +127,34 @@
         .filter(show => show.screen_id === screenId)
         .sort((a, b) => new Date(a.starts_at) - new Date(b.starts_at));
     }
-    if (!state.shows.some(show => show.id === state.selectedShowId)) state.selectedShowId = state.shows[0]?.id || null;
+    if (!state.shows.some(show => show.id === state.selectedShowId)) {
+      state.selectedShowId = state.shows[0]?.id || null;
+      if (state.shows.length > 1) {
+        const activeSeatsByShow = new Map();
+        const now = Date.now();
+        if (client) {
+          const { data: seats, error: seatError } = await client.from('show_seats')
+            .select('show_id,status,hold_expires_at')
+            .in('show_id', state.shows.map(show => show.id));
+          if (!seatError && seats) seats.forEach(seat => {
+            if (seat.status === 'booked' || (seat.status === 'held' && seat.hold_expires_at && new Date(seat.hold_expires_at).getTime() > now)) {
+              activeSeatsByShow.set(seat.show_id, (activeSeatsByShow.get(seat.show_id) || 0) + 1);
+            }
+          });
+        } else {
+          const seats = window.MockDbEngine.show_seats.filter(seat => state.shows.some(show => show.id === seat.show_id));
+          seats.forEach(seat => {
+            if (seat.status === 'booked' || (seat.status === 'held' && seat.hold_expires_at && new Date(seat.hold_expires_at).getTime() > now)) {
+              activeSeatsByShow.set(seat.show_id, (activeSeatsByShow.get(seat.show_id) || 0) + 1);
+            }
+          });
+        }
+        const activeShow = [...state.shows].sort((a, b) =>
+          (activeSeatsByShow.get(b.id) || 0) - (activeSeatsByShow.get(a.id) || 0)
+        )[0];
+        if (activeShow && (activeSeatsByShow.get(activeShow.id) || 0) > 0) state.selectedShowId = activeShow.id;
+      }
+    }
     renderShowPicker();
     if (state.selectedShowId) await selectShow(state.selectedShowId, reload);
     else {
@@ -187,14 +214,16 @@
     if (reload) await refreshDashboard();
   }
   async function refreshDashboard() {
-    if (!state.selectedShowId) return renderDashboard();
+    const requestVersion = ++state.dashboardRequestVersion;
+    const showId = state.selectedShowId;
+    if (!showId) return renderDashboard();
     if (!client) {
       const db = window.MockDbEngine;
       db.syncFromStorage();
       db.release_expired_holds();
-      const showSeats = db.show_seats.filter(row => row.show_id === state.selectedShowId);
-      const bookings = db.bookings.filter(booking => booking.show_id === state.selectedShowId);
-      const show = db.shows.find(item => item.id === state.selectedShowId);
+      const showSeats = db.show_seats.filter(row => row.show_id === showId);
+      const bookings = db.bookings.filter(booking => booking.show_id === showId);
+      const show = db.shows.find(item => item.id === showId);
       const movie = show && db.movies.find(item => item.id === show.movie_id);
       const getProfile = userId => {
         const profile = db.profiles.find(item => item.id === userId);
@@ -257,7 +286,8 @@
       renderDashboard();
       return;
     }
-    const { data, error } = await client.rpc('admin_show_data', { p_show_id: state.selectedShowId });
+    const { data, error } = await client.rpc('admin_show_data', { p_show_id: showId });
+    if (requestVersion !== state.dashboardRequestVersion || showId !== state.selectedShowId) return;
     if (error) return toast(error.message, 'error');
     state.data = data;
     renderDashboard();
@@ -279,6 +309,7 @@
     state.refreshInterval = setInterval(refreshDashboard, 2500);
   }
   function clearRealtime() {
+    state.dashboardRequestVersion++;
     if (state.channel) {
       if (client) client.removeChannel(state.channel);
       else clearInterval(state.channel);
