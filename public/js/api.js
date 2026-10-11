@@ -102,7 +102,9 @@ class CinemaApi {
     if (this.isSupabase()) {
       return await window.SupabaseBackend.fetchMovies();
     }
-    return window.MockDbEngine.movies;
+    return [...window.MockDbEngine.movies].sort((a, b) =>
+      (Date.parse(b.created_at || '') || 0) - (Date.parse(a.created_at || '') || 0)
+    );
   }
 
   async getShows() {

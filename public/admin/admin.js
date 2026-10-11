@@ -59,12 +59,16 @@
 
   async function loadMovies() {
     if (client) {
-      const { data, error } = await client.from('movies').select('id,title,poster_url,language,duration_min').order('title');
+      const { data, error } = await client.from('movies')
+        .select('id,title,poster_url,language,duration_min,created_at')
+        .order('created_at', { ascending:false });
       if (error) { toast(error.message, 'error'); return; }
       state.movies = data || [];
     } else {
       window.MockDbEngine.syncFromStorage();
-      state.movies = [...window.MockDbEngine.movies].sort((a, b) => a.title.localeCompare(b.title));
+      state.movies = [...window.MockDbEngine.movies].sort((a, b) =>
+        (Date.parse(b.created_at || '') || 0) - (Date.parse(a.created_at || '') || 0)
+      );
     }
     renderMovieOptions();
     renderCurrentMovies();
@@ -497,7 +501,7 @@
     } else {
       const db = window.MockDbEngine;
       db.syncFromStorage();
-      db.movies.push({ id:`local-movie-${Date.now()}`, ...movie });
+      db.movies.push({ id:`local-movie-${Date.now()}`, ...movie, created_at:new Date().toISOString() });
       db.persist();
       await loadMovies();
     }

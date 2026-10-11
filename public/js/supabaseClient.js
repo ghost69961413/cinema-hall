@@ -115,7 +115,7 @@ class SupabaseService {
   // Database Queries
   async fetchMovies() {
     if (!this.client) throw new Error('Supabase client not initialized');
-    const { data, error } = await this.client.from('movies').select('*').order('title');
+    const { data, error } = await this.client.from('movies').select('*').order('created_at', { ascending:false });
     if (error) throw error;
     return data;
   }
