@@ -1,5 +1,6 @@
 .admin-main { width: min(1500px, calc(100% - 3rem)); margin: 1rem auto 5rem; display:grid; grid-template-columns:minmax(260px,320px) minmax(0,1fr); gap:1.25rem; align-items:start; }
 .local-admin-test-notice { width:min(1500px,calc(100% - 3rem)); margin:2rem auto 0; padding:.75rem 1rem; display:flex; align-items:baseline; gap:.75rem; background:rgba(19,22,34,.94); border:1px solid var(--border-subtle); border-radius:var(--radius-lg); }
+.local-admin-test-notice[hidden] { display:none; }
 .local-admin-test-notice h1 { margin:0; font-size:.9rem; line-height:1.3; font-weight:700; white-space:nowrap; }
 .local-admin-test-notice p { margin:0; color:#94A3B8; font-size:.75rem; line-height:1.45; }
 .admin-cinemas, .admin-detail-header, .table-card { background:rgba(19,22,34,.94); border:1px solid var(--border-subtle); border-radius:var(--radius-lg); }

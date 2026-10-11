@@ -2,7 +2,7 @@
   const client = window.APP_CONFIG.isConfigured() && window.supabase
     ? window.supabase.createClient(window.APP_CONFIG.SUPABASE_URL, window.APP_CONFIG.SUPABASE_ANON_KEY)
     : null;
-  const state = { screens: [], movies: [], selectedScreenId: null, shows: [], selectedShowId: null, data: null, editingScreenId: null, channel: null, databaseUpdateHandler: null, countdown: null };
+  const state = { screens: [], movies: [], selectedScreenId: null, shows: [], selectedShowId: null, data: null, editingScreenId: null, channel: null, refreshInterval: null, databaseUpdateHandler: null, countdown: null };
   const $ = id => document.getElementById(id);
 
   function escapeHtml(value) {
@@ -117,7 +117,7 @@
     $('selected-cinema-title').textContent = screen?.name || 'Select a cinema';
     $('selected-cinema-subtitle').textContent = screen?.screen_type || 'Cinema details';
     if (client) {
-      const { data, error } = await client.from('shows').select('id,starts_at,ticket_price').eq('screen_id', screenId).order('starts_at');
+      const { data, error } = await client.from('shows').select('id,movie_id,screen_id,starts_at,ticket_price').eq('screen_id', screenId).order('starts_at');
       if (error) return toast(error.message, 'error');
       state.shows = data || [];
     } else {
@@ -275,11 +275,17 @@
       .subscribe(status => {
         if (status === 'SUBSCRIBED' || status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') refreshDashboard();
       });
+    // Keep the dashboard fresh if Realtime is unavailable or a database change event is missed.
+    state.refreshInterval = setInterval(refreshDashboard, 2500);
   }
   function clearRealtime() {
     if (state.channel) {
       if (client) client.removeChannel(state.channel);
       else clearInterval(state.channel);
+    }
+    if (state.refreshInterval) {
+      clearInterval(state.refreshInterval);
+      state.refreshInterval = null;
     }
     if (state.databaseUpdateHandler) {
       window.removeEventListener('database-updated', state.databaseUpdateHandler);
