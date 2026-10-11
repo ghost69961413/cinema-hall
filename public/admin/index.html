@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Admin • District Cinemas</title>
+  <link rel="icon" type="image/svg+xml" href="../favicon.svg">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <link rel="stylesheet" href="../css/style.css">
+  <link rel="stylesheet" href="admin.css">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+  <div class="ambient-glow"></div>
+  <div id="toast-container" class="toast-container"></div>
+  <header class="navbar">
+    <div class="nav-container">
+      <a class="brand admin-brand" href="/">
+        <div class="brand-icon"><i class="fa-solid fa-film" style="color:white"></i></div>
+        <div><div class="brand-title">DISTRICT CINEMAS</div><div class="brand-subtitle">Admin dashboard</div></div>
+      </a>
+      <div class="nav-actions">
+        <a class="btn btn-secondary btn-sm" href="/">Home</a>
+        <button id="admin-logout" class="btn btn-secondary btn-sm">Sign Out</button>
+      </div>
+    </div>
+  </header>
+
+  <section id="local-admin-test-notice" class="panel-card local-admin-test-notice" hidden>
+    <h1>Local admin sign-in works</h1>
+    <p>This test admin session is stored only in this browser. Connect Supabase to load and manage real cinema data.</p>
+  </section>
+  <main class="admin-main">
+    <section class="admin-cinemas panel-card">
+      <div class="admin-section-heading"><div><h1>Cinemas</h1><p>Manage screens and select one to inspect its shows.</p></div></div>
+      <form id="cinema-form" class="cinema-form">
+        <input id="cinema-name" class="form-input" type="text" placeholder="Cinema name" required maxlength="120">
+        <input id="cinema-detail" class="form-input" type="text" placeholder="Screen type or location" maxlength="120">
+        <button class="btn btn-primary btn-sm" type="submit" id="cinema-save">Add cinema</button>
+        <button class="btn btn-secondary btn-sm" type="button" id="cinema-cancel-edit" hidden>Cancel</button>
+      </form>
+      <div id="cinema-list" class="cinema-list" aria-live="polite"></div>
+    </section>
+
+    <section class="admin-details">
+      <form id="movie-form" class="movie-form panel-card">
+        <div class="show-schedule-heading"><h2>Add a movie to Currently Screening</h2><p>Paste a poster image link. The movie will appear in Currently Screening for customers.</p></div>
+        <label>Movie title<input id="movie-title" class="form-input" type="text" required maxlength="160"></label>
+        <label>Poster image link<input id="movie-poster-url" class="form-input" type="url" placeholder="https://example.com/poster.jpg" required></label>
+        <label>Language<input id="movie-language" class="form-input" type="text" required maxlength="60"></label>
+        <label>Duration (minutes)<input id="movie-duration" class="form-input" type="number" min="1" step="1" required></label>
+        <label>Genre<input id="movie-genre" class="form-input" type="text" maxlength="100"></label>
+        <label>Rating<input id="movie-rating" class="form-input" type="text" maxlength="12" value="UA"></label>
+        <label class="movie-synopsis-field">Description<textarea id="movie-synopsis" class="form-input" rows="2" maxlength="1000"></textarea></label>
+        <button id="add-movie-button" class="btn btn-primary btn-sm" type="submit">Add movie</button>
+      </form>
+      <div class="admin-detail-header panel-card">
+        <div><h1 id="selected-cinema-title">Select a cinema</h1><p id="selected-cinema-subtitle">Choose a cinema to load show details.</p></div>
+        <label id="show-picker-wrap" class="show-picker-wrap" hidden>Show
+          <select id="show-picker" class="form-input"></select>
+        </label>
+      </div>
+      <form id="show-schedule-form" class="show-schedule-form panel-card">
+        <div class="show-schedule-heading"><h2>Show schedule</h2><p>Choose a show to edit its start time and ticket price, or add a show to this cinema.</p></div>
+        <label>Cinema<select id="show-screen" class="form-input" required></select></label>
+        <label>Movie<select id="show-movie" class="form-input" required></select></label>
+        <label>Show time<input id="show-starts-at" class="form-input" type="datetime-local" required></label>
+        <label>Ticket price<input id="show-ticket-price" class="form-input" type="number" min="0" step="0.01" required></label>
+        <button id="save-show-schedule" class="btn btn-secondary btn-sm" type="submit">Save show schedule</button>
+      </form>
+      <div id="summary-cards" class="admin-summary-grid"></div>
+      <div class="admin-tables-grid">
+        <section class="panel-card table-card">
+          <div class="table-heading"><div><h2>Booked seats</h2><p id="booked-count">0 seats</p></div>
+            <input id="booked-search" class="form-input search-input" type="search" placeholder="Search name or email" aria-label="Search booked seats by user name or email">
+          </div>
+          <div class="table-scroll"><table><thead><tr><th>Seat</th><th>User name</th><th>User email</th><th>Booking ID</th><th>Booked at</th><th>Amount</th></tr></thead><tbody id="booked-table-body"></tbody></table></div>
+        </section>
+        <section class="panel-card table-card">
+          <div class="table-heading"><div><h2>Seats on hold</h2><p id="held-count">0 seats</p></div></div>
+          <div class="table-scroll"><table><thead><tr><th>Show</th><th>Time</th><th>Seat</th><th>Held by</th><th>Hold expires in</th></tr></thead><tbody id="held-table-body"></tbody></table></div>
+        </section>
+      </div>
+    </section>
+  </main>
+
+  <script src="../js/config.js"></script>
+  <script src="../js/mockDb.js"></script>
+  <script src="admin.js"></script>
+</body>
+</html>

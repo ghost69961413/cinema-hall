@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>District Cinema • Cinema Hall Ticket Booking System</title>
+  
+  <!-- Typography & Icons -->
+  <link rel="icon" type="image/svg+xml" href="favicon.svg">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  
+  <!-- Stylesheet -->
+  <link rel="stylesheet" href="css/style.css">
+
+  <!-- Supabase Client CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+
+  <!-- Ambient Glow Effect -->
+  <div class="ambient-glow"></div>
+
+  <!-- Toast Notification Container -->
+  <div id="toast-container" class="toast-container"></div>
+
+  <!-- Navigation Bar -->
+  <header class="navbar">
+    <div class="nav-container">
+      <div class="brand">
+        <div class="brand-icon">
+          <i class="fa-solid fa-film" style="color: white; font-size: 1.1rem;"></i>
+        </div>
+        <div>
+          <div class="brand-title">DISTRICT CINEMAS</div>
+          <div class="brand-subtitle">DBMS Ticket Booking Engine • PostgreSQL</div>
+        </div>
+      </div>
+
+      <div class="nav-actions">
+        <a id="admin-nav-link" class="btn btn-secondary btn-sm" href="/admin/" style="display:none;">Admin</a>
+        <!-- Live Database Inspector Button -->
+        <button id="open-inspector-btn" class="btn btn-secondary btn-sm" title="Inspect PostgreSQL Live State">
+          <i class="fa-solid fa-database text-primary"></i>
+          <span>DB Inspector</span>
+        </button>
+
+        <!-- Status Pill (Supabase / In-Memory) -->
+        <div id="status-pill" class="status-pill" title="Click to configure Supabase credentials">
+          <span id="status-dot" class="status-dot amber"></span>
+          <span id="status-text">In-Memory Engine</span>
+          <i class="fa-solid fa-gear" style="font-size: 0.7rem; color: #64748B;"></i>
+        </div>
+
+        <!-- Multi-User Switcher (Test Concurrent Holds) -->
+        <div class="user-switcher-wrap" style="display: flex; align-items: center; gap: 0.35rem;">
+          <span style="font-size: 0.72rem; color: #94A3B8;"><i class="fa-solid fa-user-group"></i> Session:</span>
+          <select id="user-switcher-select" class="form-input" style="padding: 0.25rem 0.5rem; font-size: 0.75rem; width: auto; background: #131622; border-color: #2F354D; color: white;">
+            <option value="0">Alex Rivera (User 1)</option>
+            <option value="1">Priya Sharma (User 2)</option>
+            <option value="2">Rahul Verma (User 3)</option>
+          </select>
+        </div>
+
+        <!-- User Profile / Auth Button -->
+        <button id="auth-btn" class="btn btn-secondary btn-sm" style="display: none;">Sign In</button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main App Content -->
+  <main class="main-container">
+
+    <!-- 1. Movies Showcase Section -->
+    <section>
+      <div class="section-title">
+        <span><i class="fa-solid fa-fire text-primary"></i> Currently Screening</span>
+        <span style="font-size: 0.8rem; font-weight: 500; color: #94A3B8;">Select a movie to pick showtime</span>
+      </div>
+      <div id="movies-grid" class="movies-grid">
+        <!-- Rendered dynamically by app.js -->
+      </div>
+    </section>
+
+    <!-- 2. Showtimes & Screens Section -->
+    <section id="showtimes-section" style="display: none;">
+      <div class="showtimes-card">
+        <div class="showtimes-header">
+          <div>
+            <h3 id="selected-movie-title" style="font-size: 1.15rem; font-weight: 700;">Showtimes</h3>
+            <p style="font-size: 0.75rem; color: #94A3B8;">All shows feature Dolby Atmos 7.1 or IMAX 4K Laser</p>
+          </div>
+          <div style="font-size: 0.75rem; color: #10B981; font-weight: 600;">
+            <i class="fa-solid fa-circle-check"></i> Instant Seat Hold (5 Min Window)
+          </div>
+        </div>
+        <div id="showtimes-list" class="showtime-pills">
+          <!-- Rendered dynamically -->
+        </div>
+      </div>
+    </section>
+
+    <!-- 3. District-Style Seat Map Section -->
+    <section id="seatmap-section" style="display: none;">
+      <div class="seatmap-container">
+        
+        <!-- 5-Minute Hold Countdown Banner -->
+        <div id="hold-timer-banner" class="hold-timer-banner" style="display: none;">
+          <div class="timer-info">
+            <div class="timer-badge">
+              <i class="fa-regular fa-clock"></i>
+              <span id="hold-timer-text">05:00</span>
+            </div>
+            <div>
+              <div style="font-size: 0.85rem; font-weight: 700; color: #F8FAFC;">Seats Reserved In Database</div>
+              <div style="font-size: 0.75rem; color: #94A3B8;">Complete simulated payment before time expires or rows are freed.</div>
+            </div>
+          </div>
+          <div style="display: flex; gap: 0.5rem; align-items: center;">
+            <button id="fast-forward-hold-btn" class="btn btn-secondary btn-sm" style="border-color: #F59E0B; color: #F59E0B;" title="Simulate 5 minutes passing to demonstrate auto-release">
+              <i class="fa-solid fa-forward-fast"></i> Fast-Forward (+5m)
+            </button>
+            <button id="cancel-hold-btn" class="btn btn-secondary btn-sm" style="border-color: #EF4444; color: #EF4444;">
+              <i class="fa-solid fa-xmark"></i> Release Hold
+            </button>
+          </div>
+        </div>
+
+        <!-- Cinema Screen Header -->
+        <div class="screen-curved-wrapper">
+          <div class="screen-curved-bar"></div>
+          <div class="screen-projection-glow"></div>
+          <div class="screen-label">
+            <i class="fa-solid fa-angles-down"></i> SCREEN THIS WAY <i class="fa-solid fa-angles-down"></i>
+          </div>
+          <p id="screen-title" style="font-size: 0.75rem; color: #64748B; margin-top: 0.25rem;">Audi 1</p>
+        </div>
+
+        <!-- Seat Map Legend -->
+        <div class="seat-legend">
+          <div class="legend-item">
+            <div class="legend-box" style="background: var(--seat-avail); border: 1px solid var(--seat-avail-border);"></div>
+            <span>Available</span>
+          </div>
+          <div class="legend-item">
+            <div class="legend-box" style="background: var(--seat-selected); border: 1px solid #FF6B8B; box-shadow: 0 0 8px var(--primary);"></div>
+            <span>Selected</span>
+          </div>
+          <div class="legend-item">
+            <div class="legend-box" style="background: rgba(245, 158, 11, 0.2); border: 1px solid var(--seat-held);"></div>
+            <span>Held (5m Lock)</span>
+          </div>
+          <div class="legend-item">
+            <div class="legend-box" style="background: var(--seat-booked); border: 1px solid var(--seat-booked-border);"></div>
+            <span>Booked (Sold)</span>
+          </div>
+        </div>
+
+        <!-- Interactive Seat Grid Container -->
+        <div id="seat-grid" class="seat-grid">
+          <!-- Rendered dynamically by app.js -->
+        </div>
+
+      </div>
+    </section>
+
+  </main>
+
+  <!-- Sticky Bottom Checkout Bar -->
+  <div id="bottom-checkout-bar" class="bottom-checkout-bar">
+    <div class="checkout-bar-content">
+      <div class="seats-summary">
+        <div style="font-size: 0.75rem; color: #94A3B8; margin-bottom: 0.25rem;">Selected Seats (Max 6)</div>
+        <div id="selected-seats-list" class="selected-seats-pills">
+          <!-- Seat chips -->
+        </div>
+      </div>
+      <div style="display: flex; align-items: center; gap: 1.5rem;">
+        <div>
+          <div class="checkout-total-label">Subtotal</div>
+          <div id="checkout-total-amount" class="checkout-total-price">₹0.00</div>
+        </div>
+        <!-- Action Buttons -->
+        <button id="hold-seats-btn" class="btn btn-primary">
+          <span>Hold Seats & Continue</span>
+          <i class="fa-solid fa-arrow-right"></i>
+        </button>
+        <button id="proceed-pay-btn" class="btn btn-primary" style="display: none; background: linear-gradient(135deg, #10B981, #059669);">
+          <span>Proceed to Pay</span>
+          <i class="fa-solid fa-lock"></i>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL 1: Payment Checkout Modal -->
+  <div id="checkout-modal" class="modal-overlay">
+    <div class="modal-box">
+      <div class="modal-header">
+        <h3 class="modal-title"><i class="fa-solid fa-credit-card text-primary"></i> Confirm & Pay</h3>
+        <button class="modal-close"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <div id="checkout-modal-details" class="modal-body">
+        <!-- Rendered dynamically -->
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary modal-cancel">Cancel</button>
+        <button id="confirm-pay-btn" class="btn btn-primary">Simulate Payment</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL 2: Booking Confirmation Pass -->
+  <div id="ticket-modal" class="modal-overlay">
+    <div class="modal-box" style="max-width: 520px;">
+      <div class="modal-header">
+        <h3 class="modal-title"><i class="fa-solid fa-ticket text-primary"></i> Booking Confirmed!</h3>
+        <button class="modal-close"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <div id="ticket-pass-content" class="modal-body">
+        <!-- Perforated ticket pass -->
+      </div>
+      <div class="modal-footer" style="justify-content: space-between;">
+        <button id="new-booking-btn" class="btn btn-secondary">Book Another Show</button>
+        <button id="print-ticket-btn" class="btn btn-primary"><i class="fa-solid fa-print"></i> Print Ticket</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL 3: Database & Supabase Settings -->
+  <div id="config-modal" class="modal-overlay">
+    <div class="modal-box">
+      <div class="modal-header">
+        <h3 class="modal-title"><i class="fa-solid fa-database text-primary"></i> Backend Configuration</h3>
+        <button class="modal-close"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <div class="modal-body">
+        <p style="font-size: 0.82rem; color: #94A3B8; margin-bottom: 1.25rem;">
+          Connect your live Supabase PostgreSQL database or run in-memory with ACID transactions.
+        </p>
+        <div class="form-group">
+          <label class="form-label">Supabase Project URL</label>
+          <input id="cfg-url" type="text" class="form-input" placeholder="https://xyzcompany.supabase.co" />
+        </div>
+        <div class="form-group">
+          <label class="form-label">Supabase Anon Key (Public API Key)</label>
+          <input id="cfg-key" type="password" class="form-input" placeholder="Paste your Supabase anon public key" />
+        </div>
+        <div style="font-size: 0.75rem; color: #64748B; background: #0A0C13; padding: 0.75rem; border-radius: 8px;">
+          <i class="fa-solid fa-circle-info"></i> To set up Supabase, run <code>sql/full_setup.sql</code> in the Supabase SQL Editor.
+        </div>
+      </div>
+      <div class="modal-footer" style="justify-content: space-between;">
+        <button id="reset-demo-btn" class="btn btn-secondary btn-sm">Reset Demo Engine</button>
+        <div style="display: flex; gap: 0.5rem;">
+          <button class="btn btn-secondary modal-cancel">Close</button>
+          <button id="save-config-btn" class="btn btn-primary">Connect Supabase</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL 4: User Authentication -->
+  <div id="auth-modal" class="modal-overlay">
+    <div class="modal-box" style="max-width: 400px;">
+      <div class="modal-header">
+        <h3 id="auth-modal-title" class="modal-title">Sign In</h3>
+        <button class="modal-close"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <form id="auth-form">
+        <div class="modal-body">
+          <div id="auth-name-group" class="form-group" style="display: none;">
+            <label class="form-label">Full Name</label>
+            <input id="auth-name" type="text" class="form-input" placeholder="Alex Rivera" />
+          </div>
+          <div class="form-group">
+            <label class="form-label">Email Address</label>
+            <input id="auth-email" type="email" class="form-input" placeholder="guest@districtcinemas.com" required />
+          </div>
+          <div id="auth-admin-username-group" class="form-group" style="display: none;">
+            <label class="form-label">Admin username</label>
+            <input id="auth-admin-username" type="text" class="form-input" placeholder="cinemaad" autocomplete="username" />
+          </div>
+          <div class="form-group">
+            <label class="form-label">Password</label>
+            <input id="auth-password" type="password" class="form-input" placeholder="••••••••" required />
+          </div>
+          <div id="auth-confirm-group" class="form-group" style="display: none;">
+            <label class="form-label">Confirm Password</label>
+            <input id="auth-confirm-password" type="password" class="form-input" autocomplete="new-password" />
+          </div>
+          <p style="font-size: 0.75rem; color: #94A3B8; margin-top: 0.5rem;">
+            <span id="auth-help-text">Sign in or create an account to book seats.</span>
+          </p>
+        </div>
+        <div class="modal-footer" style="justify-content: space-between; flex-wrap: wrap;">
+          <button type="button" id="toggle-auth-mode" class="btn btn-secondary btn-sm" style="border: none; background: transparent; padding: 0;">
+            Don't have an account? Sign Up
+          </button>
+          <button type="button" id="admin-auth-mode" class="btn btn-secondary btn-sm">Admin Sign In</button>
+          <button type="submit" id="auth-submit-btn" class="btn btn-primary">Sign In</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL 5: Live Database State Inspector -->
+  <div id="db-inspector-modal" class="modal-overlay">
+    <div class="modal-box" style="max-width: 680px;">
+      <div class="modal-header">
+        <h3 class="modal-title"><i class="fa-solid fa-server text-primary"></i> PostgreSQL Database Inspector</h3>
+        <button class="modal-close"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <div id="inspector-content" class="modal-body">
+        <!-- Rendered dynamically -->
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary modal-cancel">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Application Logic Scripts -->
+  <script src="js/config.js"></script>
+  <script src="js/mockDb.js"></script>
+  <script src="js/supabaseClient.js"></script>
+  <script src="js/api.js"></script>
+  <script src="js/app.js"></script>
+
+</body>
+</html>
