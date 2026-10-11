@@ -129,6 +129,8 @@ grant execute on function public.hold_seats(uuid, uuid[]) to authenticated;
 grant execute on function public.pay_booking(uuid) to authenticated;
 grant execute on function public.release_expired_holds() to authenticated;
 grant execute on function public.get_show_seat_map(uuid) to authenticated;
+-- Seat maps are public for browsing before sign-in; the function exposes only seat state.
+grant execute on function public.get_show_seat_map(uuid) to anon;
 grant execute on function public.get_booking_details(uuid) to authenticated;
 revoke all on function public.is_admin() from public, anon;
 revoke all on function public.admin_show_data(uuid) from public, anon;
