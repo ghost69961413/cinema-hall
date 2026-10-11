@@ -86,7 +86,10 @@ class SupabaseService {
 
   async signInAdmin(username, password) {
     if (!this.client) throw new Error('Supabase client not initialized');
-    if (username.trim().toLowerCase() !== 'cinemaad') throw new Error('Invalid admin username or password.');
+    const adminLoginName = username.trim().toLowerCase();
+    if (!['cinemaad', 'cinemaad@districtcinemas.com'].includes(adminLoginName)) {
+      throw new Error('Enter cinemaad or cinemaad@districtcinemas.com.');
+    }
     const { data, error } = await this.client.auth.signInWithPassword({
       email: 'cinemaad@districtcinemas.com',
       password

@@ -278,7 +278,7 @@ class CinemaApp {
     document.getElementById('admin-auth-mode').textContent = isAdmin ? 'Customer Sign In' : 'Admin Sign In';
     document.getElementById('auth-help-text').textContent = isAdmin
       ? (window.API.isSupabase()
-        ? 'Use the cinemaad admin username and the password set for its Supabase Auth account.'
+        ? 'Use cinemaad or cinemaad@districtcinemas.com with its Supabase Auth password.'
         : 'Local test admin: cinemaad. This demo sign-in only works on localhost.')
       : 'Sign in or create an account to book seats.';
   }

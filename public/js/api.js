@@ -47,7 +47,10 @@ class CinemaApi {
   }
 
   async adminLogin(username, password) {
-    if (username.trim().toLowerCase() !== 'cinemaad') throw new Error('Invalid admin username or password.');
+    const adminLoginName = username.trim().toLowerCase();
+    if (!['cinemaad', 'cinemaad@districtcinemas.com'].includes(adminLoginName)) {
+      throw new Error('Enter cinemaad or cinemaad@districtcinemas.com.');
+    }
     if (!this.isSupabase()) {
       const isLocalTest = ['localhost', '127.0.0.1', '::1'].includes(window.location.hostname);
       if (!isLocalTest || password !== 'cinemapas123') throw new Error('Invalid admin username or password.');
