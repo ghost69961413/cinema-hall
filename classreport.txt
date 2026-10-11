@@ -1,0 +1,485 @@
+1. TITLE PAGE
+-------------------------------------------------------------------------------
+Project title: Cinema Hall Ticket Booking System
+Course: TO BE FILLED BY STUDENT
+College: TO BE FILLED BY STUDENT
+Teacher: TO BE FILLED BY STUDENT
+Group members:
+  1. Nilay Mondal | Roll: 2402221530084
+     Role: TO BE FILLED BY STUDENT
+  2. Maksud Ansari | Roll: 2402221530072
+     Role: TO BE FILLED BY STUDENT
+  3. Pushkar Tyagi | Roll: 2402221530095
+     Role: TO BE FILLED BY STUDENT
+  4. Tanuj Singh | Roll: 2402221530129
+     Role: TO BE FILLED BY STUDENT
+Submission date: TO BE FILLED BY STUDENT
+
+2. ABSTRACT
+-------------------------------------------------------------------------------
+Cinema ticket booking must prevent two customers from booking one seat and must
+free seats when a customer does not complete payment. This project provides a
+web-based cinema booking system backed by PostgreSQL functions on Supabase.
+The database stores show-specific seat states, applies temporary holds, records
+payments, and releases expired holds. A browser-based concurrency simulation
+and the supplied test script demonstrate that concurrent attempts cannot both
+claim the same seat. The project also includes customer authentication, live
+seat updates, and an administrator dashboard.
+
+3. INTRODUCTION AND PROBLEM STATEMENT
+-------------------------------------------------------------------------------
+Paper-based and simple online booking can let two customers select one seat at
+the same time. A customer may also select seats and leave before paying, which
+can keep seats unavailable to others. Customers need current seat information
+while other bookings change the seating plan.
+
+This project represents every seat for every show in a show_seats table. A
+database function locks requested seat rows and creates a temporary five-minute
+hold as one transaction. Successful payment changes the seats to booked. An
+expiry function returns unpaid seats to available. Supabase Realtime and the
+frontend refresh logic communicate state changes to the interface.
+
+4. OBJECTIVES
+-------------------------------------------------------------------------------
+- Store movies, screens, seats, shows, bookings, payments, and profiles.
+- Prevent concurrent customers from claiming the same seat.
+- Hold seats temporarily while a customer completes checkout.
+- Record a confirmed booking and payment in the database.
+- Return expired, unpaid seats to the available state.
+- Show seat availability and booking information to customers and admins.
+- Restrict customer and administrator data access with Row Level Security.
+
+5. FEATURES IMPLEMENTED
+-------------------------------------------------------------------------------
+- Sign up and sign in using Supabase Auth; a trigger creates the profile row.
+- Browse movie listings, screens, showtimes, ticket prices, and seat maps.
+- Select seats subject to a maximum of six seats per hold request.
+- Create five-minute holds using the hold_seats database function.
+- Display a checkout countdown and collect a simulated payment record.
+- Confirm bookings and show booking details and ticket information.
+- Release expired holds with a scheduled function and when the seat map is read.
+- Publish show_seats changes to Supabase Realtime for live seat status updates.
+- Admin route checks the logged-in user's admin role.
+- Admin dashboard manages screens/cinemas, movies, and show schedules.
+- Admin dashboard shows show summary, booked seats, and active holds.
+- Local in-memory demo mode exists when Supabase is not configured.
+- Local development can use serve.py and its mock database endpoint.
+- The browser contains a database inspector and a concurrency demonstration.
+- A Python concurrency simulation is included in tests/concurrency_test.py.
+
+6. TECHNOLOGY STACK
+-------------------------------------------------------------------------------
+Layer                  Technology             Version          Purpose
+---------------------  ---------------------  ---------------  ----------------
+Frontend framework     None identified        Not applicable   Static web app
+Frontend language      JavaScript              ES modules       Browser logic
+Markup                 HTML                    Not versioned    Page structure
+Styling                CSS                     Not versioned    Responsive UI
+Build tool             Node.js build script    Node.js           Web asset
+                                               copying; version not specified
+Backend and database   Supabase / PostgreSQL   PostgreSQL 15+   Data and RPC
+Authentication         Supabase Auth            Supabase hosted User sign-in
+Realtime               Supabase Realtime        Supabase hosted Live row changes
+Scheduled job          pg_cron                  Extension       Expiry sweep
+Hosting                Vercel                 Not specified    Static deployment
+Source control         Git/GitHub               Not specified    Repository hosting
+Development tools      Python local server    Not specified    Local development
+Dependencies           package.json             No dependencies declared
+
+The package file identifies the project as cinema-hall version 1.0.0 and uses
+ES modules. Its build command is "npm run build", which runs "node build.mjs".
+The build script copies public/ to dist/ and injects the build configuration.
+The code uses the Supabase browser client; its library version is not declared
+in package.json. AI coding tool use is not established by this project folder:
+TO BE FILLED BY STUDENT.
+
+7. SYSTEM ARCHITECTURE
+-------------------------------------------------------------------------------
+The browser loads the static HTML, CSS, and JavaScript files. The application
+uses Supabase Auth for sessions and calls PostgreSQL functions through Supabase
+RPC for protected booking operations. PostgreSQL stores the catalog, seats,
+bookings, and payments. Row Level Security policies limit database access.
+Realtime sends published table changes to connected browsers. pg_cron runs the
+expired-hold function every minute. If Supabase configuration is unavailable,
+the app includes an in-memory demonstration mode; serve.py also provides a
+local mock database endpoint.
+
+  Customer/Admin browser
+       | Auth, database reads, RPC calls
+       v
+  Supabase Auth ---- PostgreSQL tables and functions
+                          |             |
+                          |             +--- pg_cron expiry sweep
+                          +--- Realtime publication --> connected browsers
+
+8. DATABASE DESIGN
+-------------------------------------------------------------------------------
+The following design is read from sql/01_schema.sql. UUID primary keys are
+generated with gen_random_uuid() where a default is defined. Profile IDs come
+from Supabase Auth.
+
+TABLE: profiles
+  id uuid PRIMARY KEY, references auth.users(id) ON DELETE CASCADE
+  full_name text NOT NULL
+  role text NOT NULL DEFAULT 'customer', CHECK role is customer or admin
+  created_at timestamptz NOT NULL DEFAULT now()
+
+TABLE: movies
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid()
+  title text NOT NULL; language text NOT NULL
+  duration_min int NOT NULL, CHECK duration_min > 0
+  genre text; rating text DEFAULT 'UA'; poster_url text; synopsis text
+  created_at timestamptz NOT NULL DEFAULT now()
+
+TABLE: screens
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid()
+  name text NOT NULL UNIQUE
+  screen_type text DEFAULT 'Standard'
+
+TABLE: seats
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid()
+  screen_id uuid NOT NULL, FK screens(id) ON DELETE CASCADE
+  row_label text NOT NULL; seat_number int NOT NULL
+  tier text DEFAULT 'Standard'
+  UNIQUE (screen_id, row_label, seat_number)
+
+TABLE: shows
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid()
+  movie_id uuid NOT NULL, FK movies(id) ON DELETE CASCADE
+  screen_id uuid NOT NULL, FK screens(id) ON DELETE CASCADE
+  starts_at timestamptz NOT NULL
+  ticket_price numeric(8,2) NOT NULL, CHECK ticket_price > 0
+  UNIQUE (screen_id, starts_at)
+
+TABLE: bookings
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid()
+  user_id uuid NOT NULL, FK profiles(id) ON DELETE CASCADE
+  show_id uuid NOT NULL, FK shows(id) ON DELETE CASCADE
+  status booking_status NOT NULL DEFAULT 'pending'
+  total_amount numeric(10,2) NOT NULL, CHECK total_amount >= 0
+  expires_at timestamptz NOT NULL
+  created_at timestamptz NOT NULL DEFAULT now()
+
+TABLE: show_seats
+  show_id uuid NOT NULL, FK shows(id) ON DELETE CASCADE
+  seat_id uuid NOT NULL, FK seats(id) ON DELETE CASCADE
+  status seat_status NOT NULL DEFAULT 'available'
+  booking_id uuid, FK bookings(id) ON DELETE SET NULL
+  hold_expires_at timestamptz
+  PRIMARY KEY (show_id, seat_id)
+  CHECK status = available OR booking_id IS NOT NULL
+  CHECK status is not held OR hold_expires_at IS NOT NULL
+
+TABLE: payments
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid()
+  booking_id uuid NOT NULL UNIQUE, FK bookings(id) ON DELETE CASCADE
+  amount numeric(10,2) NOT NULL, CHECK amount >= 0
+  paid_at timestamptz NOT NULL DEFAULT now()
+
+RELATIONSHIPS
+  - One profile can have many bookings.
+  - One movie can have many shows; one screen can host many shows.
+  - One screen has many physical seats.
+  - One show has one show_seats row for each physical seat on its screen.
+  - A booking can be linked from multiple show_seats rows.
+  - A booking has at most one payment, enforced by UNIQUE payments.booking_id.
+
+ENUMS, INDEXES, VIEWS, AND SECURITY
+  seat_status: available, held, booked.
+  booking_status: pending, confirmed, expired.
+  Indexes: idx_show_seats_held (hold_expires_at) WHERE status = 'held';
+  idx_shows_starts_at (starts_at); idx_bookings_user_id (user_id);
+  idx_seats_screen (screen_id).
+  No CREATE VIEW statement appears in the project SQL. Admin data is returned
+  by the admin_show_data RPC function instead.
+  RLS is enabled for profiles, movies, screens, seats, shows, show_seats,
+  bookings, and payments. Policies are defined in sql/03_rls.sql. Admins can
+  read all profiles, bookings, show seats, and payments; manage screens; and
+  insert movies and shows in the admin SQL. Customers can read public catalog
+  data and their own bookings/payments. Direct booking writes are restricted
+  and booking operations use database functions.
+
+SEAT STATE TRANSITIONS
+  available -> held: successful hold_seats call; expiration is five minutes.
+  held -> booked: successful pay_booking call before expiry.
+  held -> available: release_expired_holds after expiry, or a later seat-map
+                    read triggers an expiry sweep.
+
+  ER DIAGRAM
+  auth.users 1---1 profiles 1---many bookings 1---0..1 payments
+  movies 1---many shows many---1 screens 1---many seats
+  shows 1---many show_seats many---1 seats
+  bookings 1---many show_seats
+
+9. CORE DATABASE LOGIC
+-------------------------------------------------------------------------------
+All definitions below are in sql/01_schema.sql and sql/02_functions.sql.
+The hold and payment changes run within the database transaction that executes
+each function. Row locks and conditional updates protect shared seat rows.
+
+FUNCTION: is_admin()
+  Checks whether the authenticated profile has role 'admin'. SECURITY DEFINER
+  allows the function to read the role despite profile RLS.
+
+  create or replace function public.is_admin()
+  returns boolean language sql security definer
+  set search_path = public, pg_temp as $$
+    select exists (
+      select 1 from public.profiles
+      where id = auth.uid() and role = 'admin'
+    );
+  $$;
+
+FUNCTION: hold_seats(p_show_id uuid, p_seat_ids uuid[])
+  Requires a signed-in user and between one and six distinct seats. It locks
+  show_seats rows ordered by seat_id with SELECT FOR UPDATE. It creates a
+  pending booking with a five-minute expiry, then conditionally updates only
+  available or expired-held rows. If it cannot update every requested row, it
+  raises an exception; PostgreSQL rolls back the transaction. Fixed lock order
+  reduces deadlock risk. Core SQL:
+
+  perform 1 from show_seats
+   where show_id = p_show_id and seat_id = any(p_seat_ids)
+   order by seat_id for update;
+  insert into bookings (user_id, show_id, total_amount, expires_at)
+  values (v_user_id, p_show_id, v_price * cardinality(p_seat_ids),
+          now() + interval '5 minutes') returning id into v_booking;
+  update show_seats
+     set status = 'held', booking_id = v_booking,
+         hold_expires_at = now() + interval '5 minutes'
+   where show_id = p_show_id and seat_id = any(p_seat_ids)
+     and (status = 'available' or
+          (status = 'held' and hold_expires_at < now()));
+  get diagnostics v_updated = row_count;
+  if v_updated <> cardinality(p_seat_ids) then
+    raise exception 'Someone just took one of these seats';
+  end if;
+
+FUNCTION: pay_booking(p_booking_id uuid)
+  Locks the current user's unexpired pending booking. It confirms that held
+  seats still exist, changes them to booked, creates one payment row, and marks
+  the booking confirmed. Row-count validation raises an error if the hold
+  changed before the transaction could complete.
+
+  select total_amount into v_amount from bookings
+   where id = p_booking_id and user_id = v_user_id
+     and status = 'pending' and expires_at > now() for update;
+  if not found then raise exception 'Booking expired or not found'; end if;
+  select count(*) into v_seats from show_seats
+   where booking_id = p_booking_id and status = 'held'
+     and hold_expires_at > now();
+  update show_seats set status = 'booked', hold_expires_at = null
+   where booking_id = p_booking_id and status = 'held'
+     and hold_expires_at > now();
+  get diagnostics v_booked = row_count;
+  if v_booked <> v_seats then
+    raise exception 'Seats are no longer held';
+  end if;
+  insert into payments (booking_id, amount) values (p_booking_id, v_amount);
+  update bookings set status = 'confirmed' where id = p_booking_id;
+
+FUNCTION: release_expired_holds()
+  Changes expired held seats to available and marks expired pending bookings
+  as expired. It returns the number of released seats. pg_cron schedules it
+  each minute using the expression '* * * * *'.
+
+  update show_seats
+     set status = 'available', booking_id = null, hold_expires_at = null
+   where status = 'held' and hold_expires_at < now();
+  get diagnostics v_count = row_count;
+  update bookings set status = 'expired'
+   where status = 'pending' and expires_at < now();
+  return v_count;
+
+FUNCTION: get_show_seat_map(p_show_id uuid)
+  Calls release_expired_holds before returning seat ID, row, number, tier,
+  status, hold expiry, and whether the current user owns the hold. This keeps
+  an expired hold from continuing to appear occupied when the seat map loads.
+
+FUNCTION: admin_show_data(p_show_id uuid)
+  Requires is_admin(). Returns show and screen details, total/booked/held/
+  available counts, booking count, confirmed-payment sum, booked-seat records,
+  and unexpired held-seat records as JSON. It joins seats, bookings, profiles,
+  auth users, and payments for the dashboard data.
+
+FUNCTION: get_booking_details(p_booking_id uuid)
+  Returns a JSON booking summary, show/movie/screen information, seats, and
+  payment for the booking that belongs to auth.uid().
+
+TRIGGER FUNCTIONS
+  handle_new_user() inserts or updates profiles when a row is added to
+  auth.users. populate_show_seats() adds available show_seats rows for the
+  seats on a newly inserted show. Both are PL/pgSQL trigger functions in
+  sql/01_schema.sql. The full function bodies are in that file.
+
+The project SQL sets up pg_cron and schedules public.release_expired_holds()
+once per minute. The actual enabled state on the hosted Supabase project is
+not verifiable from this local folder: TO BE FILLED BY STUDENT.
+
+10. HOW DOUBLE BOOKING IS PREVENTED
+-------------------------------------------------------------------------------
+1. Each user sends a hold request for a show and one or more seat IDs.
+2. hold_seats verifies authentication and the requested seat count.
+3. PostgreSQL locks the selected rows in show_id and seat_id order.
+4. The function updates only available or expired-held rows.
+5. If another transaction holds a requested row first, the conditional update
+   cannot update every row and the function raises an exception.
+6. That exception rolls the entire transaction back, including its booking row.
+7. The successful transaction leaves the seat held for five minutes; a second
+   user cannot successfully hold it during that interval.
+
+11. DBMS CONCEPTS DEMONSTRATED
+-------------------------------------------------------------------------------
+Concept                    Where used
+-------------------------- -----------------------------------------------
+Relational design          Separate movies, screens, seats, shows, etc.
+Primary and foreign keys   UUID IDs and references across tables
+Constraints                NOT NULL, UNIQUE, CHECK, enum and FK constraints
+Transactions               Hold and payment functions update related rows
+Concurrency control        SELECT FOR UPDATE and conditional UPDATE
+Deadlock reduction         Lock requested seat rows in a stable order
+Indexes                    Four explicit indexes in sql/01_schema.sql
+Stored functions           Hold, pay, release, seat map and admin RPCs
+Scheduled jobs             pg_cron release schedule, once every minute
+Access control             Supabase Auth, RLS, admin role function
+Realtime                   Supabase publication and browser subscriptions
+Trigger automation         Profile creation and show seat population
+
+12. DEPLOYMENT DETAILS
+-------------------------------------------------------------------------------
+Frontend hosting platform: Vercel
+Live website: https://cinema-hall-blond.vercel.app/
+GitHub repository: https://github.com/ghost69961413/cinema-hall
+Database/backend: Supabase, project URL host hmydrojbyvrvesfmgcjb.supabase.co
+Supabase region: TO BE FILLED BY STUDENT
+Build command: npm run build
+Output directory: dist
+Vercel install command: npm install
+Environment variable names: VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY
+The values are intentionally omitted from this report.
+Vercel build configuration is in vercel.json. The repository is connected
+to GitHub; pushes to the deployment branch trigger deployments when the Vercel
+Git integration is enabled. Confirm the production branch in Vercel settings.
+The configured rewrite maps /admin to /admin/index.html. Other route rewrite
+behavior is not defined in vercel.json.
+Supabase Site URL, redirect URL entries, publication settings, and pg_cron
+enabled status are hosted project settings and cannot be verified from the
+local repository: TO BE FILLED BY STUDENT.
+The project files specify free-tier hosting for the deployment workflow, but
+the current billing plan is external account data: TO BE FILLED BY STUDENT.
+Free Supabase projects may pause after inactivity; check the current Supabase
+plan documentation and project dashboard for the applicable policy.
+
+13. TESTING AND RESULTS
+-------------------------------------------------------------------------------
+Test case                                  Actual result
+-----------------------------------------  -------------------------------
+50 parallel attempts for one seat          PASS: 1 succeeds, 49 fail
+Atomic all-or-nothing multi-seat hold      PASS in simulation
+Pay within hold window                     PASS in simulation
+Expired payment rejected                   PASS in simulation
+Expired seat can be held again             PASS in simulation
+Two live users see a hold without refresh  TO BE VERIFIED BY STUDENT
+Live simultaneous database booking         TO BE VERIFIED BY STUDENT
+Live expiry after five minutes             TO BE VERIFIED BY STUDENT
+Live payment books seats for all users     TO BE VERIFIED BY STUDENT
+Non-admin is redirected from /admin        TO BE VERIFIED BY STUDENT
+Unauthenticated seat-page access           TO BE VERIFIED BY STUDENT
+
+The included tests/concurrency_test.py was run for this report. It is a
+threaded in-memory simulation of database operations, not a test against the
+hosted Supabase database. Its five reported checks passed.
+
+14. PROJECT MAPPING
+-------------------------------------------------------------------------------
+Program Outcomes (POs):
+- PO1 Engineering knowledge: applies DBMS fundamentals such as ER design,
+  normalization, SQL, constraints, transactions and locking.
+- PO2 Problem analysis: analyses double booking and abandoned payments and
+  reduces them to seat states and a hold timer.
+- PO3 Design and development of solutions: designs the schema and the hold,
+  pay and release functions.
+- PO5 Modern tool usage: uses Supabase, PostgreSQL, Row Level Security,
+  Realtime and pg_cron.
+- PO9 Individual and team work: a 4-member group divided database design,
+  backend functions, frontend and testing.
+
+Program Specific Outcomes (PSOs):
+- PSO1: Design and develop database-driven software systems.
+- PSO2: Use modern platforms and tools to build reliable and secure
+  applications.
+Note: replace this generic wording with the department's exact text.
+
+Sustainable Development Goals:
+- SDG 9 Industry, Innovation and Infrastructure: reliable digital booking
+  infrastructure where data stays consistent under heavy use.
+- SDG 11 Sustainable Cities and Communities: easier access to entertainment
+  services without queues, and unpaid seats return to sale.
+
+15. TEAM CONTRIBUTION
+-------------------------------------------------------------------------------
+Member              Roll number       Contribution
+------------------  ----------------  ----------------------------------------
+Nilay Mondal        2402221530084     TO BE FILLED BY STUDENT
+Maksud Ansari       2402221530072     TO BE FILLED BY STUDENT
+Pushkar Tyagi       2402221530095     TO BE FILLED BY STUDENT
+Tanuj Singh         2402221530129     TO BE FILLED BY STUDENT
+
+The local project folder has no Git history, so commits could not be used to
+verify individual contributions.
+
+16. LIMITATIONS
+-------------------------------------------------------------------------------
+- The frontend describes payment as simulated; no external payment gateway
+  integration is present in the inspected source.
+- The scheduled expiration sweep runs every minute. A hold can therefore
+  remain stored as held for up to about one minute after its five-minute
+  expiry unless a seat-map read or another operation releases it sooner.
+- The automated concurrency tests use an in-memory simulation and do not
+  connect to the deployed PostgreSQL database.
+- Free-tier limits, the current Supabase region, project settings, and current
+  billing plans depend on external account settings not stored in this folder.
+- The project uses a static frontend without a framework dependency declared
+  in package.json.
+
+17. CONCLUSION
+-------------------------------------------------------------------------------
+The project implements a cinema booking workflow in which PostgreSQL stores
+seat state and coordinates temporary holds, payment confirmation, and expiry.
+Database constraints, row locking, conditional updates, and RLS support data
+consistency and access control. The supplied concurrency simulation passes its
+checks, while live service settings and end-to-end tests should be verified
+before final submission.
+
+18. SCREENSHOTS TO ATTACH
+-------------------------------------------------------------------------------
+[ ] Login page
+[ ] Sign-up page
+[ ] Movie list
+[ ] Seat map with a held seat visible to a second user
+[ ] Payment screen with countdown
+[ ] Booking confirmation
+[ ] Admin page showing both tables
+[ ] Supabase table editor showing the tables
+[ ] Supabase function list
+[ ] Live deployed site URL in the browser
+
+19. REFERENCES
+-------------------------------------------------------------------------------
+Supabase documentation: https://supabase.com/docs
+PostgreSQL documentation: https://www.postgresql.org/docs/
+Vercel documentation: https://vercel.com/docs
+HTML documentation: https://developer.mozilla.org/docs/Web/HTML
+CSS documentation: https://developer.mozilla.org/docs/Web/CSS
+JavaScript documentation: https://developer.mozilla.org/docs/Web/JavaScript
+
+ITEMS TO COMPLETE OR VERIFY
+-------------------------------------------------------------------------------
+- Course, college, teacher, submission date, and four group member details.
+- Names and roles of AI coding tools used, if any.
+- Supabase region and live project settings for URL redirects, Realtime,
+  pg_cron, and billing plan.
+- Vercel production branch and current automatic deployment setting.
+- Live cross-user hold, booking, expiry, admin-access, and seat-page tests.
+- Attach the screenshots listed in section 18.
+- Replace generic PSO wording if the department supplies official wording.
