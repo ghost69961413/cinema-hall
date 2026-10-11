@@ -112,7 +112,32 @@ create index if not exists idx_shows_starts_at on public.shows (starts_at);
 create index if not exists idx_bookings_user_id on public.bookings (user_id);
 create index if not exists idx_seats_screen on public.seats (screen_id);
 
--- 12. AUTOMATIC PROFILE CREATION TRIGGER (SUPABASE AUTH)
+-- 12. DEFAULT SEAT MAP FOR EVERY NEW CINEMA SCREEN
+create or replace function public.populate_screen_seats()
+returns trigger
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+begin
+  insert into public.seats (screen_id, row_label, seat_number, tier)
+  select new.id, layout.row_label, seat_number, layout.tier
+  from (values
+    ('A', 8, 'Recliner'), ('B', 8, 'Recliner'),
+    ('C', 10, 'Prime'), ('D', 10, 'Prime'),
+    ('E', 10, 'Classic'), ('F', 10, 'Classic')
+  ) as layout(row_label, seat_count, tier)
+  cross join lateral generate_series(1, layout.seat_count) as seat_numbers(seat_number);
+  return new;
+end;
+$$;
+
+drop trigger if exists trg_populate_screen_seats on public.screens;
+create trigger trg_populate_screen_seats
+  after insert on public.screens
+  for each row execute function public.populate_screen_seats();
+
+-- 13. AUTOMATIC PROFILE CREATION TRIGGER (SUPABASE AUTH)
 create or replace function public.handle_new_user()
 returns trigger as $$
 begin
